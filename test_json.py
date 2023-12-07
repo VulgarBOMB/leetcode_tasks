@@ -2,7 +2,6 @@ import json
 import requests
 import pandas as pd
 import numpy as np
-from variables import token
 
 json_line = \
     {
@@ -37,7 +36,7 @@ json_line = \
 
 
 def export_all_calendar_plans():
-    api_token = token
+    api_token = ''
     url = 'https://api.smartsheet.com/2.0/sheets?includeAll=true'
     headers = {
         'Authorization': f'Bearer {api_token}',
@@ -67,7 +66,7 @@ def export_all_calendar_plans():
                                        arr_permalink,
                                        arr_createdAt,
                                        arr_modifiedAt)),
-                      columns=['id',
+                      columns=['plan_id',
                                'name',
                                'accessLevel',
                                'permalink',
@@ -77,7 +76,7 @@ def export_all_calendar_plans():
 
 
 def export_one_calendar_plan(sheet_id):
-    api_token = token
+    api_token = ''
     url = f'https://api.smartsheet.com/2.0/sheets/{sheet_id}'
     headers = {
         'Authorization': f'Bearer {api_token}',
@@ -203,17 +202,23 @@ def transform_calendar_plan(df_plans):
     for link in list(df_plans['permalink']):
         array_of_df.append(export_one_calendar_plan(link[34:]))
     df = pd.concat(array_of_df)
-    df.to_excel("output.xlsx")
+    return df
 
 
 # print(export_all_calendar_plans().to_string())
 # sheet_id = 'Q3jV68JcPvH5c973H56M7W8R8pQRpvWXhgMJrWp1'
 # sheet_id = '75R7HvcH7GHG3V3XJ9XV5QqWxwhm2q2hRPCJpG71'
-# sheet_id = '3782984957486980'
+# sheet_id = '8796430488889220'
 # print(export_one_calendar_plan(sheet_id).to_string())
 
-transform_calendar_plan(export_all_calendar_plans())
-# 20:36:50
-# 20:42:50
-# 20:58:20
-# 21:37:20
+# print(pd.read_csv("result.csv", sep='\t').to_string())
+# print(pd.read_csv("result.csv", sep='\t').dtypes)
+# print('------------------------')
+# print(export_all_calendar_plans().astype({'plan_id': 'int64'}).dtypes)
+df = pd.merge(export_all_calendar_plans().astype({'plan_id': 'int64'}),
+              transform_calendar_plan(export_all_calendar_plans()).astype({'plan_id': 'int64'}),
+              how="right", on=["plan_id"])
+df.to_excel("result.xlsx")
+
+# transform_calendar_plan(export_all_calendar_plans())
+
