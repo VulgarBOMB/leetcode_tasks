@@ -2,6 +2,7 @@ import json
 import requests
 import pandas as pd
 import numpy as np
+from variables import token
 
 json_line = \
     {
@@ -36,7 +37,7 @@ json_line = \
 
 
 def export_all_calendar_plans():
-    api_token = ''
+    api_token = token
     url = 'https://api.smartsheet.com/2.0/sheets?includeAll=true'
     headers = {
         'Authorization': f'Bearer {api_token}',
@@ -48,6 +49,7 @@ def export_all_calendar_plans():
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         sheet_data = response.json()
+        # print(str(sheet_data).replace('\"', '\\"').replace('\'', '\"').replace('False', 'false').replace('True', 'true'))
     else:
         print(f'Error: {response.status_code}')
 
@@ -75,7 +77,7 @@ def export_all_calendar_plans():
 
 
 def export_one_calendar_plan(sheet_id):
-    api_token = ''
+    api_token = token
     url = f'https://api.smartsheet.com/2.0/sheets/{sheet_id}'
     headers = {
         'Authorization': f'Bearer {api_token}',
@@ -98,22 +100,23 @@ def export_one_calendar_plan(sheet_id):
         'Базовый показатель - конец': None,
         'Расхождение': None
     }
-    arrays = {}
     arr_row_id, arr_row_number, arr_task_name, arr_task_duration = [], [], [], []
     arr_task_start, arr_task_end, arr_task_parent, arr_task_responsible = [], [], [], []
     arr_task_percent_done, arr_task_state, arr_task_comment, arr_task_docs = [], [], [], []
     arr_task_stage, arr_task_base_start, arr_task_base_end, arr_task_gap = [], [], [], []
+    arr_plan_id = []
 
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         sheet_data = response.json()
-        # print(str(sheet_data).replace('\"', '\\"').replace('\'', '\"').replace('False', 'false').replace('True', 'true'))
+        # print(str(sheet_data).replace('\\xa0', ' ').replace('\"', '\\"').replace('\'', '\"').replace('False', 'false').replace('True', 'true'))
     else:
         print(f'Error: {response.status_code}')
 
     for column in sheet_data['columns']:
-        if column['title'] in titles.keys():
-            titles[column['title']] = column['id']
+        title = column['title'].replace(' ', ' ').replace('—', '-')
+        if title in titles.keys():
+            titles[title] = column['id']
 
     all_column_ids = [
         titles['Имя задачи'],
@@ -140,6 +143,9 @@ def export_one_calendar_plan(sheet_id):
             if column_id in row_values:
                 row_values[column_id] = cell.get('value')
 
+        arr_plan_id.append(sheet_data['id'])
+        arr_row_id.append(row['id'])
+        arr_row_number.append(row['rowNumber'])
         arr_task_name.append(row_values[titles['Имя задачи']])
         arr_task_duration.append(row_values[titles['Длительность']])
         arr_task_start.append(row_values[titles['Начало']])
@@ -155,7 +161,10 @@ def export_one_calendar_plan(sheet_id):
         arr_task_base_end.append(row_values[titles['Базовый показатель - конец']])
         arr_task_gap.append(row_values[titles['Расхождение']])
 
-    df = pd.DataFrame(np.column_stack((arr_task_name,
+    df = pd.DataFrame(np.column_stack((arr_plan_id,
+                                       arr_row_id,
+                                       arr_row_number,
+                                       arr_task_name,
                                        arr_task_duration,
                                        arr_task_start,
                                        arr_task_end,
@@ -169,8 +178,11 @@ def export_one_calendar_plan(sheet_id):
                                        arr_task_base_start,
                                        arr_task_base_end,
                                        arr_task_gap)),
-                      columns=['task_name',
-                               'task_dur',
+                      columns=['plan_id',
+                               'row_id',
+                               'row_number',
+                               'task_name',
+                               'task_duration',
                                'task_start',
                                'task_end',
                                'task_parent',
@@ -186,7 +198,22 @@ def export_one_calendar_plan(sheet_id):
     return df
 
 
+def transform_calendar_plan(df_plans):
+    array_of_df = []
+    for link in list(df_plans['permalink']):
+        array_of_df.append(export_one_calendar_plan(link[34:]))
+    df = pd.concat(array_of_df)
+    df.to_excel("output.xlsx")
+
+
 # print(export_all_calendar_plans().to_string())
 # sheet_id = 'Q3jV68JcPvH5c973H56M7W8R8pQRpvWXhgMJrWp1'
-sheet_id = '75R7HvcH7GHG3V3XJ9XV5QqWxwhm2q2hRPCJpG71'
-print(export_one_calendar_plan(sheet_id).to_string())
+# sheet_id = '75R7HvcH7GHG3V3XJ9XV5QqWxwhm2q2hRPCJpG71'
+# sheet_id = '3782984957486980'
+# print(export_one_calendar_plan(sheet_id).to_string())
+
+transform_calendar_plan(export_all_calendar_plans())
+# 20:36:50
+# 20:42:50
+# 20:58:20
+# 21:37:20
